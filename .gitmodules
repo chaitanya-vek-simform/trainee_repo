@@ -1,0 +1,6 @@
+[submodule "trainee_frontend"]
+	path = trainee_frontend
+	url = git@github.com:chaitanya-vek-simform/trainee_frontend.git
+[submodule "trainee_backend"]
+	path = trainee_backend
+	url = git@github.com:chaitanya-vek-simform/trainee_backend.git
