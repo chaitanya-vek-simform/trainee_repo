@@ -1,1 +1,4 @@
 BATCH_STATE.md
+gpt/*
+.env.example
+.env

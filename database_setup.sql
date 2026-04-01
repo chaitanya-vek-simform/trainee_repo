@@ -1,5 +1,5 @@
 -- Database Creation
-CREATE DATABASE IF NOT EXISTS trainee_db;
+CREATE DATABASE IF NOT EXISTS trainee_db2;
 
 USE trainee_db;
 
