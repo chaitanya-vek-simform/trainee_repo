@@ -1,32 +1,38 @@
 # Docker Compose Setup — Trainee Full-Stack Application
 
-This documents how to run the entire application stack using **Docker Compose** with 4 distinct services and network isolation.
+This documents how to run the entire application stack using **Docker Compose** with a simplified single-port entry point.
 
 ---
 
 ## Architecture Overview
 
 ```
-Host Machine
-├── :5001  ──▶  [nginx (Gateway)]  ──▶  [frontend (Port 80)]
-└── :5000  ──▶  [nginx (Gateway)]  ──▶  [backend (Port 5000)]
-                                         └──▶ [database (Port 3306)]
+Host Machine (Port 80)
+      │
+      ▼
+[nginx (Gateway)]
+      │
+      ├───▶ [frontend (Static UI)]
+      │
+      └───▶ [backend (API Logic)]
+               │
+               └───▶ [database (MySQL)]
 ```
 
 | Service    | Port (Internal) | Port (Host) | Purpose                         | Network(s)          |
 | :--------- | :-------------- | :---------- | :------------------------------ | :------------------ |
-| `database` | 3306            | -           | MySQL persistence               | `backend_net`       |
-| `backend`  | 5000            | -           | Node.js API                     | `backend_net`, `frontend_net` |
+| **`nginx`**    | 80              | **80**      | Single Gateway Point            | `frontend_net`      |
 | `frontend` | 80              | -           | Static React server             | `frontend_net`      |
-| `nginx`    | 5000, 5001      | 5000, 5001  | Central gateway proxy           | `frontend_net`      |
+| `backend`  | 5000            | -           | Node.js API                     | `frontend_net`, `backend_net` |
+| `database` | 3306            | -           | MySQL persistence               | `backend_net`       |
 
 ---
 
 ## 🔒 Network Isolation
 
-We use two primary networks for security:
-1.  **`backend_net`**: Only the `database` and `backend` services can communicate. The database is shielded from the frontend and the gateway.
-2.  **`frontend_net`**: Used for `nginx` gateway to route requests to either the `frontend` or `backend` services.
+We use two primary networks:
+1.  **`frontend_net`**: Connects `nginx`, `frontend`, and `backend`. Used for all web and API traffic.
+2.  **`backend_net`**: **Strictly isolates** the `database` from everything except the `backend` service.
 
 ---
 
@@ -35,13 +41,12 @@ We use two primary networks for security:
 ### 1. Build and Start the Stack
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 ### 2. Verify Access
 
-- **Frontend UI**: [http://localhost:5001](http://localhost:5001)
-- **Backend API**: [http://localhost:5000/api](http://localhost:5000/api)
+- **Web App (UI & API)**: [http://localhost:8080](http://localhost:8080) (using mapped port 8080)
 
 ---
 
@@ -49,26 +54,20 @@ docker-compose up -d --build
 
 ```bash
 # Check service status
-docker-compose ps
+docker compose ps
 
-# View logs for all services
-docker-compose logs -f
+# View logs
+docker compose logs -f
 
-# Stop and remove containers
-docker-compose down
-
-# Stop, remove containers, and delete volumes (warning: deletes DB data)
-docker-compose down -v
-
-# Rebuild a single service (e.g. after code changes)
-docker-compose up -d --build backend
+# Shut down the stack
+docker compose down
 ```
 
 ---
 
 ## ⚙️ Environment Configuration
 
-- **`database.env`**: Controls the `database` container (MySQL user/password).
-- **`trainee_backend/.env`**: Controls the `backend` container (API port, database connection details).
-
-Both are gitignored so sensitive info never leaves your local machine.
+Edit these files locally before building:
+- **`database.env`**: MySQL root/user credentials.
+- **`trainee_backend/.env`**: Backend to Database connection strings.
+- **`trainee_frontend/Dockerfile`**: Build-time API URL (`VITE_API_URL=/api`).

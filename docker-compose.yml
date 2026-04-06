@@ -27,6 +27,8 @@ services:
     build:
       context: ./trainee_frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=/api
     container_name: frontend
     networks:
       - frontend_net
@@ -37,8 +39,7 @@ services:
       dockerfile: Dockerfile
     container_name: nginx_proxy
     ports:
-      - "5000:5000"
-      - "5001:5001"
+      - "8080:80"
     depends_on:
       - frontend
       - backend
