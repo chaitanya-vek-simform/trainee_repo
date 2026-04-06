@@ -13,8 +13,10 @@ trainee_backend/Dockerfile
 
 # Docker files
 Dockerfile
-nginx.conf
 README_DOCKER.md
+
+# Env files
+database.env
 
 # Misc
 *.md

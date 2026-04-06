@@ -3,3 +3,4 @@ gpt/*
 .env.example
 .env
 README_DOCKER.md
+database.env
