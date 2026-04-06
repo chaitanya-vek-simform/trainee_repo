@@ -1,0 +1,55 @@
+services:
+  database:
+    image: mysql:latest
+    container_name: database
+    env_file:
+      - database.env
+    volumes:
+      - ./database_setup.sql:/docker-entrypoint-initdb.d/init.sql
+      - db_data:/var/lib/mysql
+    networks:
+      - backend_net
+
+  backend:
+    build:
+      context: ./trainee_backend
+      dockerfile: Dockerfile
+    container_name: backend
+    env_file:
+      - trainee_backend/.env
+    depends_on:
+      - database
+    networks:
+      - backend_net
+      - frontend_net
+
+  frontend:
+    build:
+      context: ./trainee_frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    networks:
+      - frontend_net
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: nginx_proxy
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - frontend_net
+
+networks:
+  backend_net:
+    driver: bridge
+  frontend_net:
+    driver: bridge
+
+volumes:
+  db_data:
