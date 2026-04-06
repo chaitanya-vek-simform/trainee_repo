@@ -1,0 +1,21 @@
+# Git
+.git
+.gitignore
+.gitmodules
+
+# Node modules (frontend will install fresh inside Docker)
+trainee_frontend/node_modules
+
+# Backend — not needed for the Nginx image build
+trainee_backend/node_modules
+trainee_backend/.env
+trainee_backend/Dockerfile
+
+# Docker files
+Dockerfile
+nginx.conf
+README_DOCKER.md
+
+# Misc
+*.md
+*.sql
