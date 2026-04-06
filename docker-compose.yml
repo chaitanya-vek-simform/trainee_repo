@@ -7,8 +7,13 @@ services:
     volumes:
       - ./database_setup.sql:/docker-entrypoint-initdb.d/init.sql
       - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pyourpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
-      - backend_net
+      - backend_network
 
   backend:
     build:
@@ -18,10 +23,10 @@ services:
     env_file:
       - trainee_backend/.env
     depends_on:
-      - database
+      database:
+        condition: service_healthy
     networks:
-      - backend_net
-      - frontend_net
+      - backend_network
 
   frontend:
     build:
@@ -31,7 +36,7 @@ services:
         - VITE_API_URL=/api
     container_name: frontend
     networks:
-      - frontend_net
+      - frontend_network
 
   nginx:
     build:
@@ -44,12 +49,13 @@ services:
       - frontend
       - backend
     networks:
-      - frontend_net
+      - frontend_network
+      - backend_network
 
 networks:
-  backend_net:
+  frontend_network:
     driver: bridge
-  frontend_net:
+  backend_network:
     driver: bridge
 
 volumes:

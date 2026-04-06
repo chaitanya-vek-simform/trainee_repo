@@ -1,73 +1,47 @@
-# Docker Compose Setup — Trainee Full-Stack Application
+# Simplified Docker Compose (Hub & Spoke Networking)
 
-This documents how to run the entire application stack using **Docker Compose** with a simplified single-port entry point.
+This setup uses **Nginx** as the central hub connecting isolated frontend and backend networks.
 
 ---
 
-## Architecture Overview
+## Architecture
 
 ```
-Host Machine (Port 80)
+Host Machine (Port 8080)
       │
       ▼
-[nginx (Gateway)]
+[nginx (Gateway)]  ◄─── Bridge
       │
-      ├───▶ [frontend (Static UI)]
+      ├─── (frontend_network) ───▶ [frontend]
       │
-      └───▶ [backend (API Logic)]
-               │
-               └───▶ [database (MySQL)]
+      └─── (backend_network) ────▶ [backend]
+                                     └───▶ [database]
 ```
-
-| Service    | Port (Internal) | Port (Host) | Purpose                         | Network(s)          |
-| :--------- | :-------------- | :---------- | :------------------------------ | :------------------ |
-| **`nginx`**    | 80              | **80**      | Single Gateway Point            | `frontend_net`      |
-| `frontend` | 80              | -           | Static React server             | `frontend_net`      |
-| `backend`  | 5000            | -           | Node.js API                     | `frontend_net`, `backend_net` |
-| `database` | 3306            | -           | MySQL persistence               | `backend_net`       |
 
 ---
 
 ## 🔒 Network Isolation
 
-We use two primary networks:
-1.  **`frontend_net`**: Connects `nginx`, `frontend`, and `backend`. Used for all web and API traffic.
-2.  **`backend_net`**: **Strictly isolates** the `database` from everything except the `backend` service.
+- **`frontend_network`**: Contains `nginx` and `frontend`.
+- **`backend_network`**: Contains `nginx`, `backend`, and `database`.
+- **Logic**: Nginx is the only "Dual-Homed" service. The Frontend cannot see the Backend, and the Database is doubly-shielded.
 
 ---
 
-## 🚀 How to Run
-
-### 1. Build and Start the Stack
+## 🚀 Run & Access
 
 ```bash
 docker compose up -d --build
 ```
 
-### 2. Verify Access
-
-- **Web App (UI & API)**: [http://localhost:8080](http://localhost:8080) (using mapped port 8080)
+- **Web App**: [http://localhost:8080](http://localhost:8080)
 
 ---
 
-## 🛠️ Management Commands
+## 🛠️ Management
 
 ```bash
-# Check service status
 docker compose ps
-
-# View logs
 docker compose logs -f
-
-# Shut down the stack
 docker compose down
 ```
-
----
-
-## ⚙️ Environment Configuration
-
-Edit these files locally before building:
-- **`database.env`**: MySQL root/user credentials.
-- **`trainee_backend/.env`**: Backend to Database connection strings.
-- **`trainee_frontend/Dockerfile`**: Build-time API URL (`VITE_API_URL=/api`).
