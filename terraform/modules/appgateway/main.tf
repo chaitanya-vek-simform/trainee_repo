@@ -1,7 +1,34 @@
+locals {
+  frontend_port_name = "port-http"
+  frontend_ip_name   = "frontend-ip-config"
+  listener_name      = "listener-http"
+
+  backend_pool_backend  = "pool-backend"
+  backend_pool_frontend = "pool-frontend"
+
+  http_settings_backend  = "settings-backend"
+  http_settings_frontend = "settings-frontend"
+
+  url_path_map_name = "url-path-map"
+  routing_rule_name = "rule-main"
+
+  agw_sku_name = var.enable_waf ? "WAF_v2" : "Standard_v2"
+  agw_sku_tier = var.enable_waf ? "WAF_v2" : "Standard_v2"
+
+  storage_host = replace(
+    replace(var.frontend_storage_endpoint, "https://", ""),
+    "/",
+    ""
+  )
+
+  custom_error_url_403 = "${var.frontend_storage_endpoint}waf-blocked.html"
+  custom_error_url_502 = "${var.frontend_storage_endpoint}waf-502.html"
+}
+
 resource "azurerm_user_assigned_identity" "appgw" {
-  name                = "agw-identity"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  name                = var.user_assigned_identity_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
 
   tags = {
     ManagedBy = "Terraform"
@@ -10,9 +37,9 @@ resource "azurerm_user_assigned_identity" "appgw" {
 
 resource "azurerm_web_application_firewall_policy" "main" {
   count               = var.enable_waf ? 1 : 0
-  name                = "waf-policy-srs-prod"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  name                = var.waf_policy_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
 
   policy_settings {
     enabled                     = true
@@ -35,9 +62,9 @@ resource "azurerm_web_application_firewall_policy" "main" {
 }
 
 resource "azurerm_public_ip" "appgw" {
-  name                = "pip-agw-srs-prod"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  name                = var.public_ip_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
 
   allocation_method = "Static"
   sku               = "Standard"
@@ -47,39 +74,16 @@ resource "azurerm_public_ip" "appgw" {
   }
 }
 
-locals {
-  frontend_port_name = "port-http"
-  frontend_ip_name   = "frontend-ip-config"
-  listener_name      = "listener-http"
-
-  backend_pool_backend  = "pool-backend"
-  backend_pool_frontend = "pool-frontend"
-
-  http_settings_backend  = "settings-backend"
-  http_settings_frontend = "settings-frontend"
-
-  url_path_map_name = "url-path-map"
-  routing_rule_name = "rule-main"
-
-  agw_sku_name = var.enable_waf ? "WAF_v2" : "Standard_v2"
-  agw_sku_tier = var.enable_waf ? "WAF_v2" : "Standard_v2"
-
-  storage_host = replace(
-    replace(data.azurerm_storage_account.frontend.primary_web_endpoint, "https://", ""),
-    "/",
-    ""
-  )
-
-  custom_error_url_403 = "${data.azurerm_storage_account.frontend.primary_web_endpoint}waf-blocked.html"
-  custom_error_url_502 = "${data.azurerm_storage_account.frontend.primary_web_endpoint}waf-502.html"
-
-  ssl_cert_secret_uri = "${data.azurerm_key_vault.main.vault_uri}secrets/${var.ssl_cert_name}"
+resource "azurerm_role_assignment" "appgw_kv_secrets" {
+  scope                = var.key_vault_id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.appgw.principal_id
 }
 
 resource "azurerm_application_gateway" "main" {
   name                = var.app_gateway_name
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  resource_group_name = var.resource_group_name
+  location            = var.location
 
   firewall_policy_id = var.enable_waf ? azurerm_web_application_firewall_policy.main[0].id : null
 
@@ -96,7 +100,7 @@ resource "azurerm_application_gateway" "main" {
 
   gateway_ip_configuration {
     name      = "gateway-ip-config"
-    subnet_id = azurerm_subnet.appgw.id
+    subnet_id = var.subnet_id
   }
 
   frontend_ip_configuration {
@@ -121,7 +125,7 @@ resource "azurerm_application_gateway" "main" {
     for_each = var.enable_ssl ? [1] : []
     content {
       name                = var.ssl_cert_name
-      key_vault_secret_id = local.ssl_cert_secret_uri
+      key_vault_secret_id = var.ssl_cert_secret_uri
     }
   }
 
@@ -137,7 +141,7 @@ resource "azurerm_application_gateway" "main" {
 
   backend_address_pool {
     name  = local.backend_pool_backend
-    fqdns = ["${var.backend_app_name}.azurewebsites.net"]
+    fqdns = [var.backend_app_fqdn]
   }
 
   backend_address_pool {
@@ -255,10 +259,6 @@ resource "azurerm_application_gateway" "main" {
   }
 
   depends_on = [
-    azurerm_public_ip.appgw,
-    azurerm_subnet.appgw,
-    azurerm_linux_web_app.backend,
-    data.azurerm_storage_account.frontend,
-    azurerm_user_assigned_identity.appgw,
+    azurerm_role_assignment.appgw_kv_secrets,
   ]
 }

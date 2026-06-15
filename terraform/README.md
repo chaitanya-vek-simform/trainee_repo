@@ -1,13 +1,22 @@
 # 🏗️ Terraform — Azure Infrastructure for Student Records System
 
-This Terraform configuration provisions a full-stack production environment on Azure:
+This Terraform project creates the Azure infrastructure for the student records app.
 
-- **Frontend:** React SPA → Azure Storage Account (Static Website)
-- **Backend:** Node.js/Express (Docker) → Azure App Service (Linux Container)
-- **Database:** MySQL Flexible Server (VNet-integrated, private access only)
-- **Routing:** Application Gateway (WAF_v2) with path-based routing
-- **Registry:** Azure Container Registry (ACR) for backend Docker images
-- **Secrets:** Azure Key Vault with RBAC + Managed Identity
+What it provisions:
+
+- **Frontend:** React SPA hosted in Azure Storage static website
+- **Backend:** Node.js/Express Docker app on Azure App Service
+- **Database:** Private MySQL Flexible Server
+- **Routing:** Application Gateway with path-based routing and optional WAF
+- **Registry:** Azure Container Registry for backend images
+- **Secrets:** Azure Key Vault with managed identity access
+
+If you are new to Terraform, the simplest mental model is:
+
+1. Create the Azure resources that Terraform itself needs first.
+2. Fill in `terraform.tfvars` with your values.
+3. Run `terraform init`, `terraform plan`, and `terraform apply`.
+4. Use the outputs to deploy the backend image and frontend build.
 
 ---
 
@@ -50,19 +59,131 @@ This Terraform configuration provisions a full-stack production environment on A
 | `main.tf` | Provider config, resource group |
 | `variables.tf` | All input variables with defaults |
 | `terraform.tfvars` | Your actual values (⚠️ gitignored) |
-| `networking.tf` | VNet, subnets, NSGs, DNS zone |
-| `acr.tf` | Container Registry + AcrPull role |
-| `database.tf` | MySQL Flexible Server + firewall |
-| `backend.tf` | App Service Plan + Linux Web App |
-| `frontend.tf` | Storage Account data source |
-| `keyvault.tf` | Key Vault data source + role assignments |
-| `appgateway.tf` | Application Gateway, WAF, probes, routing |
-| `monitoring.tf` | Log Analytics + diagnostic settings |
 | `outputs.tf` | Useful values printed after apply |
+| `modules/` | Reusable Terraform modules for each major component |
+| `backend.hcl.example` | Template for remote backend config |
+
+Current root Terraform files are intentionally kept small:
+
+- `main.tf` holds the provider, data sources, module wiring, and root outputs.
+- `variables.tf` holds the input variables.
+- `outputs.tf` is only for output declarations that root consumers will use.
+
+### Module Layout
+
+The root module is now thin and only wires dependencies together. The actual resources live under `modules/`:
+
+- `modules/networking` — VNet, subnets, NSGs
+- `modules/database` — MySQL server, database, private DNS link
+- `modules/backend-app` — App Service Plan and Linux Web App
+- `modules/acr` — Azure Container Registry and root-level AcrPull assignment
+- `modules/appgateway` — App Gateway, WAF, identity, routing
+- `modules/monitoring` — Log Analytics and diagnostics
+
+Each module now follows the same file pattern:
+
+- `variables.tf` — inputs
+- `main.tf` — resources and local values
+- `outputs.tf` — outputs exposed to the root module
 
 ---
 
 ## 🚀 Complete Setup Guide
+
+## Beginner Order
+
+Follow these steps in this order if you are implementing the whole project from scratch:
+
+1. Create the manual Azure resources that Terraform references later: Storage Account, Key Vault, and the backend state storage.
+2. Copy `terraform.tfvars.example` to `terraform.tfvars` and edit the values.
+3. Put the backend config values into `backend.hcl` from `backend.hcl.example`.
+4. Run `terraform init`.
+5. Run `terraform plan` and review the changes.
+6. Run `terraform apply`.
+7. Push the backend Docker image to ACR.
+8. Build the frontend and upload it to the Storage Account.
+9. Point your DNS to the Application Gateway public IP.
+10. Enable SSL later if you need HTTPS.
+
+### Remote Backend (Recommended Before First Apply)
+
+Use Azure Blob Storage backend so Terraform state is shared and locked.
+
+Files involved:
+- `main.tf` (add `backend "azurerm" {}` inside `terraform` block)
+- `backend.hcl.example` (new file with backend values template)
+- `README.md` (this section)
+
+1) Create backend resources (one-time)
+
+```bash
+az group create \
+  --name <BACKEND_RG> \
+  --location <BACKEND_LOCATION>
+
+az storage account create \
+  --name <BACKEND_STORAGE_NAME> \
+  --resource-group <BACKEND_RG> \
+  --location <BACKEND_LOCATION> \
+  --sku Standard_LRS \
+  --kind StorageV2 \
+  --min-tls-version TLS1_2
+
+az storage container create \
+  --name tfstate \
+  --account-name <BACKEND_STORAGE_NAME>
+```
+
+2) Add backend block in `main.tf`
+
+```hcl
+terraform {
+  required_version = ">= 1.5.0"
+
+  backend "azurerm" {}
+
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.74"
+    }
+  }
+}
+```
+
+3) Create `backend.hcl` from template
+
+```bash
+cp backend.hcl.example backend.hcl
+```
+
+Example values:
+
+```hcl
+resource_group_name  = "<BACKEND_RG>"
+storage_account_name = "<BACKEND_STORAGE_NAME>"
+container_name       = "tfstate"
+key                  = "prod.terraform.tfstate"
+```
+
+4) Initialize and migrate state
+
+```bash
+terraform init -backend-config=backend.hcl -reconfigure
+```
+
+If local state exists, Terraform will prompt to migrate it to remote backend.
+
+5) Environment-safe state key naming
+
+Use one key per environment:
+- `dev.terraform.tfstate`
+- `staging.terraform.tfstate`
+- `prod.terraform.tfstate`
+
+Tip:
+- Keep `backend.hcl` out of Git if it contains environment-specific values.
+- `.gitignore` in this repo already ignores Terraform state and tfvars.
 
 ### Prerequisites
 
@@ -71,13 +192,23 @@ This Terraform configuration provisions a full-stack production environment on A
 - [Docker](https://docs.docker.com/get-docker/) (for building backend image)
 - [Node.js](https://nodejs.org/) (>= 18, for building frontend)
 
+### What To Prepare Before `terraform apply`
+
+Terraform expects a few Azure resources to already exist:
+
+- A Storage Account for the frontend static website and App Gateway error pages
+- A Key Vault that stores the `db-password` secret
+- A blob storage account/container for the remote Terraform backend
+
+Without these, `terraform apply` will fail because the root module reads them as data sources.
+
 ---
 
 ### Step 0 — Authenticate with Azure
 
 ```bash
 az login
-az account set --subscription "f4d12eb7-f43c-4022-b86c-3c1cd5466bff"
+az account set --subscription "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 ```
 
 ---
@@ -211,7 +342,7 @@ cd ../../trainee_frontend
 # Build with API URL pointing to App Gateway path-based routing
 VITE_API_URL=/api npm run build
 
-cd ../azure-deployment/terraform
+cd ../terraform
 ```
 
 ---
@@ -242,7 +373,7 @@ custom_domain        = "yourdomain.com"
 
 ```bash
 # Initialize — downloads provider plugins
-terraform init
+terraform init -backend-config=backend.hcl -reconfigure
 
 # Preview what will be created
 terraform plan
@@ -262,6 +393,8 @@ This creates:
 - ✅ Application Gateway (WAF_v2) with path-based routing
 - ✅ Log Analytics + Diagnostics
 - ✅ RBAC role assignments (AcrPull, Key Vault Secrets User)
+
+If you only want to learn the flow first, do `terraform plan` before `terraform apply`.
 
 ---
 
@@ -289,7 +422,7 @@ az storage blob list \
 Get the App Gateway public IP:
 
 ```bash
-terraform output app_gateway_public_ip
+terraform output app_gateway_ip
 # e.g., 20.212.9.145
 ```
 
@@ -354,6 +487,12 @@ az webapp log tail \
   --resource-group rg-srs-prod
 ```
 
+You can also use the Terraform output command:
+
+```bash
+terraform output backend_push_command
+```
+
 ### Deploying Frontend Changes
 
 ```bash
@@ -374,7 +513,7 @@ az storage blob upload-batch \
 curl https://backend-app-srs-prod.azurewebsites.net/health
 
 # Through App Gateway
-curl http://$(terraform output -raw app_gateway_public_ip)/api/health
+curl http://$(terraform output -raw app_gateway_ip)/api/health
 
 # App Gateway backend health
 az network application-gateway show-backend-health \
@@ -400,5 +539,19 @@ az keyvault purge --name kv-srs-prod --location southeastasia  # free up the nam
 az acr delete --name acrsrsprod --resource-group rg-srs-prod -y
 az group delete --name rg-srs-prod -y
 ```
+
+### Beginner Checklist
+
+- [ ] Backend backend state storage exists
+- [ ] Storage Account exists for the frontend and error pages
+- [ ] Key Vault exists and contains `db-password`
+- [ ] `terraform.tfvars` is filled in
+- [ ] `backend.hcl` exists locally
+- [ ] `terraform init` completed successfully
+- [ ] `terraform plan` looks correct
+- [ ] `terraform apply` completed successfully
+- [ ] Backend image pushed to ACR
+- [ ] Frontend uploaded to Storage Account
+- [ ] DNS points to the Application Gateway IP
 
 ---

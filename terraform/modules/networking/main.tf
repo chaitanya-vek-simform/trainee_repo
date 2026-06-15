@@ -1,7 +1,7 @@
 resource "azurerm_virtual_network" "main" {
-  name                = "vnet-srs-prod"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  name                = var.vnet_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
   address_space       = [var.vnet_address_space]
 
   tags = {
@@ -10,15 +10,15 @@ resource "azurerm_virtual_network" "main" {
 }
 
 resource "azurerm_subnet" "appgw" {
-  name                 = "subnet-appgw-srs-prod"
-  resource_group_name  = azurerm_resource_group.main.name
+  name                 = var.subnet_appgw_name
+  resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes     = [var.subnet_appgw_prefix]
 }
 
 resource "azurerm_subnet" "backend" {
-  name                 = "subnet-backend-srs-prod"
-  resource_group_name  = azurerm_resource_group.main.name
+  name                 = var.subnet_backend_name
+  resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes     = [var.subnet_backend_prefix]
 
@@ -32,8 +32,8 @@ resource "azurerm_subnet" "backend" {
 }
 
 resource "azurerm_subnet" "db" {
-  name                 = "subnet-db-srs-prod"
-  resource_group_name  = azurerm_resource_group.main.name
+  name                 = var.subnet_db_name
+  resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes     = [var.subnet_db_prefix]
 
@@ -49,9 +49,9 @@ resource "azurerm_subnet" "db" {
 }
 
 resource "azurerm_network_security_group" "appgw" {
-  name                = "nsg-appgw-srs-prod"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  name                = var.appgw_nsg_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
 
   security_rule {
     name                       = "Allow-HTTP"
@@ -96,9 +96,9 @@ resource "azurerm_subnet_network_security_group_association" "appgw" {
 }
 
 resource "azurerm_network_security_group" "backend" {
-  name                = "nsg-backend-srs-prod"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  name                = var.backend_nsg_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
 
   security_rule {
     name                       = "Allow-HTTP-From-AppGW"
@@ -131,9 +131,9 @@ resource "azurerm_subnet_network_security_group_association" "backend" {
 }
 
 resource "azurerm_network_security_group" "db" {
-  name                = "nsg-db-srs-prod"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  name                = var.db_nsg_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
 
   security_rule {
     name                       = "Allow-MySQL-From-Backend"
@@ -165,15 +165,30 @@ resource "azurerm_subnet_network_security_group_association" "db" {
   network_security_group_id = azurerm_network_security_group.db.id
 }
 
-resource "azurerm_private_dns_zone" "dnszone-mysql-srs-prod" {
-  name                = "srs.private.mysql.database.azure.com"
-  resource_group_name = azurerm_resource_group.main.name
+output "vnet_id" {
+  value = azurerm_virtual_network.main.id
 }
 
-resource "azurerm_private_dns_zone_virtual_network_link" "mysql" {
-  name                  = "dns-link-mysql-srs-prod"
-  resource_group_name   = azurerm_resource_group.main.name
-  private_dns_zone_name = azurerm_private_dns_zone.dnszone-mysql-srs-prod.name
-  virtual_network_id    = azurerm_virtual_network.main.id
-  registration_enabled  = false
+output "appgw_subnet_id" {
+  value = azurerm_subnet.appgw.id
+}
+
+output "backend_subnet_id" {
+  value = azurerm_subnet.backend.id
+}
+
+output "db_subnet_id" {
+  value = azurerm_subnet.db.id
+}
+
+output "appgw_subnet_prefix" {
+  value = var.subnet_appgw_prefix
+}
+
+output "backend_subnet_prefix" {
+  value = var.subnet_backend_prefix
+}
+
+output "db_subnet_prefix" {
+  value = var.subnet_db_prefix
 }

@@ -1,0 +1,226 @@
+Multi-Environment Remote Backend Guide for Terraform
+====================================================
+
+Goal
+----
+Use the same Terraform codebase for multiple environments such as dev, staging, and prod, while keeping each environment's state in a separate remote backend and a separate state file.
+
+Why this is important
+---------------------
+If all environments share one state file, changes in dev can accidentally affect staging or prod.
+Separate state files keep the environments isolated and easier to manage.
+
+
+Recommended setup
+-----------------
+Use one of these patterns:
+
+1) Separate backend state files in the same storage account/container
+   - Same Azure Storage Account
+   - Same container
+   - Different state key per environment
+
+2) Separate backend storage accounts or containers per environment
+   - dev has its own backend storage
+   - staging has its own backend storage
+   - prod has its own backend storage
+
+For beginners, option 1 is simpler. For stricter isolation, option 2 is better.
+
+
+Files to create or keep locally
+-------------------------------
+Create one backend config file per environment:
+
+- `backend-dev.hcl`
+- `backend-staging.hcl`
+- `backend-prod.hcl`
+
+Do not commit these files if they contain environment-specific values.
+
+
+Step 1: Create remote backend storage
+--------------------------------------
+If you use option 1, you can create one backend storage account and one container:
+
+```bash
+az group create \
+  --name rg-tfstate \
+  --location southeastasia
+
+az storage account create \
+  --name <BACKEND_STORAGE_NAME> \
+  --resource-group rg-tfstate \
+  --location southeastasia \
+  --sku Standard_LRS \
+  --kind StorageV2 \
+  --min-tls-version TLS1_2
+
+az storage container create \
+  --name tfstate \
+  --account-name <BACKEND_STORAGE_NAME>
+```
+
+If you use option 2, repeat this for each environment with different storage accounts or containers.
+
+
+Step 2: Keep the Terraform code the same
+----------------------------------------
+Do not change the resource definitions for each environment.
+
+The same Terraform files and modules can be reused for dev, staging, and prod.
+
+Only the following should change:
+
+- backend config file
+- variable values in `terraform.tfvars`
+- environment-specific naming values
+
+
+Step 3: Create environment-specific backend config files
+--------------------------------------------------------
+
+Example: `backend-dev.hcl`
+
+```hcl
+resource_group_name  = "rg-tfstate"
+storage_account_name = "<BACKEND_STORAGE_NAME>"
+container_name       = "tfstate"
+key                  = "dev.terraform.tfstate"
+```
+
+Example: `backend-staging.hcl`
+
+```hcl
+resource_group_name  = "rg-tfstate"
+storage_account_name = "<BACKEND_STORAGE_NAME>"
+container_name       = "tfstate"
+key                  = "staging.terraform.tfstate"
+```
+
+Example: `backend-prod.hcl`
+
+```hcl
+resource_group_name  = "rg-tfstate"
+storage_account_name = "<BACKEND_STORAGE_NAME>"
+container_name       = "tfstate"
+key                  = "prod.terraform.tfstate"
+```
+
+If you use separate backends per environment, then each file should point to the correct storage account and container for that environment.
+
+
+Step 4: Initialize Terraform for the chosen environment
+-------------------------------------------------------
+
+To work on dev:
+
+```bash
+terraform init -backend-config=backend-dev.hcl -reconfigure
+terraform plan -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars
+```
+
+To work on staging:
+
+```bash
+terraform init -backend-config=backend-staging.hcl -reconfigure
+terraform plan -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars
+```
+
+To work on prod:
+
+```bash
+terraform init -backend-config=backend-prod.hcl -reconfigure
+terraform plan -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars
+```
+
+Important:
+- Run `terraform init -reconfigure` every time you switch between environments.
+- Terraform remembers the backend from the last initialization, so switching without reconfigure can cause confusion.
+
+
+Step 5: Use separate variable files too
+---------------------------------------
+Backend separation alone is not enough.
+
+Use different variable values for each environment:
+
+- `terraform.tfvars.dev`
+- `terraform.tfvars.staging`
+- `terraform.tfvars.prod`
+
+Example:
+
+```bash
+terraform plan -var-file=terraform.tfvars.dev
+terraform apply -var-file=terraform.tfvars.dev
+```
+
+
+Step 6: Recommended naming pattern
+-----------------------------------
+Use environment-specific names so resources are easy to identify:
+
+- `rg-srs-dev`
+- `rg-srs-staging`
+- `rg-srs-prod`
+
+- `acr-srs-dev`
+- `acr-srs-staging`
+- `acr-srs-prod`
+
+- `mysql-srs-dev`
+- `mysql-srs-staging`
+- `mysql-srs-prod`
+
+
+Beginner example
+-----------------
+Suppose you want to test a new feature in dev.
+
+Without separate state:
+- Terraform might think dev and prod are the same infrastructure.
+- A small change can affect the wrong environment.
+
+With separate state files:
+- dev changes are tracked in `dev.terraform.tfstate`
+- staging changes are tracked in `staging.terraform.tfstate`
+- prod changes are tracked in `prod.terraform.tfstate`
+
+That means each environment can evolve independently.
+
+
+Practical workflow
+------------------
+1. Make code changes once in the shared Terraform files.
+2. Choose the environment backend config.
+3. Choose the environment variable file.
+4. Run `terraform init -reconfigure`.
+5. Run `terraform plan`.
+6. Run `terraform apply`.
+7. Repeat for the next environment only after reviewing the plan.
+
+
+Troubleshooting
+---------------
+1) Error: Backend changed
+   - Run `terraform init -reconfigure` with the correct backend config file.
+
+2) Error: State file not found
+   - Check the `key` value in your backend config.
+
+3) Error: Wrong environment updated
+   - Confirm you used the right `backend-*.hcl` and `terraform.tfvars.*` file.
+
+
+Checklist
+---------
+[ ] Create backend storage
+[ ] Create backend-dev.hcl, backend-staging.hcl, and backend-prod.hcl
+[ ] Create environment-specific variable files
+[ ] Run terraform init with the correct backend config
+[ ] Run terraform plan before terraform apply
+[ ] Verify the state file key matches the environment

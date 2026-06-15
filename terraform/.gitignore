@@ -8,6 +8,7 @@
 
 # Your actual variable values (contain passwords — never commit)
 terraform.tfvars
+backend.hcl
 
 # Terraform working directory
 .terraform/
