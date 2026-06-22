@@ -1,0 +1,39 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# terraform/.gitignore
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Terraform state files (contain secrets — NEVER commit)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Terraform plan output
+*.tfplan
+
+# Your actual variable values (contain passwords — NEVER commit)
+# Copy terraform.tfvars.example → terraform.tfvars and fill in real values
+terraform.tfvars
+backend.hcl
+
+# Environment-specific secret files (same rule — never commit)
+environments/**/terraform.tfvars
+environments/**/backend.hcl
+
+# Terraform working directories
+.terraform/
+environments/**/.terraform/
+environments/**/.terraform.lock.hcl
+.terraform.lock.hcl
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Override files (local dev overrides — not for version control)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Web app logs
+./webapp-logs/*
