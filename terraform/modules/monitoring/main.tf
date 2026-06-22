@@ -12,7 +12,7 @@ resource "azurerm_log_analytics_workspace" "main" {
 }
 
 resource "azurerm_monitor_diagnostic_setting" "appgw" {
-  name                       = "agw-diagnostics-srs-prod"
+  name                       = var.diagnostic_setting_name
   target_resource_id         = var.app_gateway_id
   log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
 

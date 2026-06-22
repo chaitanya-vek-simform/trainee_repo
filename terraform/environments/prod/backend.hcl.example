@@ -1,0 +1,17 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# environments/prod/backend.hcl.example
+#
+# HOW TO USE:
+#   cp backend.hcl.example backend.hcl
+#   Fill in the storage account name.
+#   terraform init -backend-config=backend.hcl -reconfigure
+#
+# IMPORTANT: backend.hcl is gitignored — do not commit it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resource_group_name  = "rg-tfstate"
+storage_account_name = "<BACKEND_STORAGE_NAME>"
+container_name       = "tfstate"
+
+# Isolated state file for prod — never shares state with dev
+key = "prod.terraform.tfstate"

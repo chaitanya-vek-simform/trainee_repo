@@ -1,0 +1,76 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# environments/prod/terraform.tfvars.example
+#
+# HOW TO USE:
+#   cp terraform.tfvars.example terraform.tfvars
+#   Edit terraform.tfvars with your real values.
+#
+# IMPORTANT:
+#   - Never commit terraform.tfvars — it contains secrets!
+#   - terraform.tfvars is gitignored in this repo.
+#
+# DEPLOY ORDER:
+#   1. Apply prod environment FIRST (it creates the shared ACR)
+#   2. Copy shared_acr_name from terraform output into dev/terraform.tfvars
+#   3. Apply dev environment
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Azure Identity ─────────────────────────────────────────────────────────────
+subscription_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# ── Environment ────────────────────────────────────────────────────────────────
+environment  = "prod"
+project_name = "app-srs"
+location     = "centralindia"
+
+# ── Resource Group ─────────────────────────────────────────────────────────────
+resource_group_name = "rg-srs-prod"
+
+# ── Networking ─────────────────────────────────────────────────────────────────
+# IMPORTANT: prod uses 10.0.0.0/16 — dev uses 10.1.0.0/16 (no overlap)
+vnet_address_space    = "10.0.0.0/16"
+subnet_appgw_prefix   = "10.0.1.0/24"
+subnet_backend_prefix = "10.0.2.0/24"
+subnet_db_prefix      = "10.0.3.0/24"
+
+# ── Shared ACR (owned by prod) ─────────────────────────────────────────────────
+# Must be globally unique — lowercase letters and numbers only, 5-50 chars, no hyphens
+acr_name = "acrsrsprod"
+
+# ACR SKU: Standard recommended for prod (100 GB storage, content trust, webhooks)
+# Upgrade to Premium if you need geo-replication or private endpoints for ACR
+acr_sku = "Standard"
+
+# ── MySQL Database ─────────────────────────────────────────────────────────────
+mysql_server_name    = "mysql-srs-prod"          # Must be globally unique
+mysql_admin_username = "mysqladmin"
+mysql_admin_password = "YourStr0ng!PasswordProd"  # Use Key Vault — do NOT commit this
+mysql_sku            = "B_Standard_B2ms"           # 2 vCores burstable (~$28/mo) — scales well
+
+# ── App Service (Backend) ─────────────────────────────────────────────────────
+app_service_plan_name = "asp-srs-prod"
+backend_app_name      = "backendapp-srs-prod"   # Must be globally unique
+backend_image_tag     = "latest"                # Prod images tagged :latest
+app_service_plan_sku  = "B1"                    # Upgrade to P1v3 for auto-scaling
+
+# ── Storage Account (Frontend) ─────────────────────────────────────────────────
+# Create this manually first — see README Section 2 (Prerequisites)
+storage_account_name = "storagesrsprod"
+
+# ── Key Vault ─────────────────────────────────────────────────────────────────
+# Create this manually first — see README Section 2 (Prerequisites)
+key_vault_name = "kv-srs-prod-cv"
+
+# ── Application Gateway ───────────────────────────────────────────────────────
+app_gateway_name = "agw-srs-prod"
+
+# Phase 1 — first deployment: keep both false
+# Phase 2 — after cert is uploaded: set enable_ssl = true
+# Phase 3 — production hardening: set enable_waf = true
+enable_waf    = false              # Set to true for OWASP protection (+$20-30/mo)
+enable_ssl    = false              # Set to true AFTER uploading cert to Key Vault
+custom_domain = "chaitanya-vek.me"
+ssl_cert_name = "ssl-cert-srs-prod"
+
+# ── Monitoring ─────────────────────────────────────────────────────────────────
+log_retention_days = 90     # 90 days recommended for production compliance

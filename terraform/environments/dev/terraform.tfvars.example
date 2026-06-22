@@ -1,0 +1,67 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# environments/dev/terraform.tfvars.example
+#
+# HOW TO USE:
+#   cp terraform.tfvars.example terraform.tfvars
+#   Edit terraform.tfvars with your real values.
+#
+# IMPORTANT:
+#   - Never commit terraform.tfvars — it contains secrets!
+#   - terraform.tfvars is gitignored in this repo.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Azure Identity ─────────────────────────────────────────────────────────────
+subscription_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# ── Environment ────────────────────────────────────────────────────────────────
+environment  = "dev"
+project_name = "app-srs"
+location     = "centralindia"
+
+# ── Resource Group ─────────────────────────────────────────────────────────────
+resource_group_name = "rg-srs-dev"
+
+# ── Networking ─────────────────────────────────────────────────────────────────
+# IMPORTANT: Use 10.1.0.0/16 for dev to avoid IP overlap with prod (10.0.0.0/16)
+vnet_address_space    = "10.1.0.0/16"
+subnet_appgw_prefix   = "10.1.1.0/24"
+subnet_backend_prefix = "10.1.2.0/24"
+subnet_db_prefix      = "10.1.3.0/24"
+
+# ── Shared ACR (deployed by prod, referenced here) ────────────────────────────
+# Set these after running terraform apply in environments/prod/
+acr_name                = "acrsrsprod"     # The prod ACR name
+acr_resource_group_name = "rg-srs-prod"   # The prod resource group
+
+# ── MySQL Database ─────────────────────────────────────────────────────────────
+mysql_server_name    = "mysql-srs-dev"     # Must be globally unique
+mysql_admin_username = "mysqladmin"
+mysql_admin_password = "YourStr0ng!PasswordDev"   # Store in Key Vault, not here
+mysql_sku            = "B_Standard_B1ms"   # Cheapest burstable — fine for dev
+
+# ── App Service (Backend) ─────────────────────────────────────────────────────
+app_service_plan_name = "asp-srs-dev"
+backend_app_name      = "backendapp-srs-dev"   # Must be globally unique
+backend_image_tag     = "dev"                  # Push images as :dev tag
+
+# Phase 1 (no VNet connectivity needed): F1
+# Phase 2 (needs DB access via VNet):   B1
+app_service_plan_sku = "B1"
+
+# ── Storage Account (Frontend) ─────────────────────────────────────────────────
+# Create this manually first — see README Section 2 (Prerequisites)
+storage_account_name = "storagesrsdev"
+
+# ── Key Vault ─────────────────────────────────────────────────────────────────
+# Create this manually first — see README Section 2 (Prerequisites)
+key_vault_name = "kv-srs-dev-cv"
+
+# ── Application Gateway ───────────────────────────────────────────────────────
+app_gateway_name = "agw-srs-dev"
+enable_waf       = false    # Keep false for dev — saves ~$20-30/month
+enable_ssl       = false    # Phase 1: HTTP only. Phase 2: set to true after uploading cert
+custom_domain    = ""       # Leave blank for dev, or use "dev.yourdomain.com"
+ssl_cert_name    = "ssl-cert-srs-dev"
+
+# ── Monitoring ─────────────────────────────────────────────────────────────────
+log_retention_days = 30     # Minimum — keeps cost low for dev

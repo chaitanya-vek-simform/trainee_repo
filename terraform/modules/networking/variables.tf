@@ -23,36 +23,36 @@ variable "subnet_db_prefix" {
 }
 
 variable "vnet_name" {
-  type    = string
-  default = "vnet-srs-prod"
+  type        = string
+  description = "Name of the Virtual Network"
 }
 
 variable "subnet_appgw_name" {
-  type    = string
-  default = "subnet-appgw-srs-prod"
+  type        = string
+  description = "Name of the Application Gateway subnet"
 }
 
 variable "subnet_backend_name" {
-  type    = string
-  default = "subnet-backend-srs-prod"
+  type        = string
+  description = "Name of the Backend App Service subnet"
 }
 
 variable "subnet_db_name" {
-  type    = string
-  default = "subnet-db-srs-prod"
+  type        = string
+  description = "Name of the Database subnet"
 }
 
 variable "appgw_nsg_name" {
-  type    = string
-  default = "nsg-appgw-srs-prod"
+  type        = string
+  description = "Name of the Application Gateway NSG"
 }
 
 variable "backend_nsg_name" {
-  type    = string
-  default = "nsg-backend-srs-prod"
+  type        = string
+  description = "Name of the Backend NSG"
 }
 
 variable "db_nsg_name" {
-  type    = string
-  default = "nsg-db-srs-prod"
-}
+  type        = string
+  description = "Name of the Database NSG"
+}

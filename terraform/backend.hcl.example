@@ -1,4 +1,0 @@
-resource_group_name  = "<BACKEND_RG>"
-storage_account_name = "<BACKEND_STORAGE_NAME>"
-container_name       = "tfstate"
-key                  = "prod.terraform.tfstate"
